@@ -39,3 +39,30 @@
 
 # debug information files
 *.dwo
+
+# CMake
+CMakeCache.txt
+CMakeFiles/
+CMakeScripts/
+cmake_install.cmake
+install_manifest.txt
+CTestTestfile.cmake
+_deps/
+out/
+build/
+
+# Ninja
+.ninja_deps
+.ninja_log
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+*.sln
+*.vcxproj
+*.vcxproj.filters
+*.vcxproj.user
+
+# Visual Studio cache/options directory
+.vscode/
