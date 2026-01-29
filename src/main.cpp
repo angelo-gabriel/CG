@@ -11,7 +11,7 @@
 
 void glfw_error_callback(int error, const char* description)
 {
-	gl_log_err("GLFW ERROR: code %i msg: %s\n", error, description);
+	gl_log_err("GLFW ERROR: code {} msg: {}\n", error, description);
 }
 
 int g_win_width = 640;
@@ -45,10 +45,9 @@ void _update_fps_counter(GLFWwindow* window)
 	if (elapsed_seconds > 0.25)
 	{
 		previous_seconds = current_seconds;
-		char tmp[128];
 		double fps = (double)frame_count / elapsed_seconds;
-		sprintf_s(tmp, sizeof(tmp), "opengl @ fps: %.2f", fps);
-		glfwSetWindowTitle(window, tmp);
+		std::string title = std::format("opengl @ fps: {:.2f}", fps);
+		glfwSetWindowTitle(window, title.c_str());
 		frame_count = 0;
 	}
 	frame_count++;
@@ -93,7 +92,7 @@ int main() {
 		return 1;
 	}
 
-	gl_log("starting GLFW\n%s\n", glfwGetVersionString());
+	gl_log("starting GLFW: {}\n", glfwGetVersionString());
 
 	glfwWindowHint(GLFW_SAMPLES, 8);
 
