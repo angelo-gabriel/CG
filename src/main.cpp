@@ -1,4 +1,4 @@
-#include <GL/glew.h>
+﻿#include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
 #include <assert.h>
@@ -187,20 +187,34 @@ bool is_valid(GLuint program)
 // read shader from external file
 std::string read_shader_file(const std::string& path)
 {
-	std::ifstream file;
-	file.open(path);
+	std::ifstream file(path);
+	if (!file.is_open())
+	{
+		fprintf(stderr, "ERROR: Could not open shader file: %s\n", path.c_str());
+		return "";
+	}
 
 	std::stringstream buffer;
 	buffer << file.rdbuf();
-
 	return buffer.str();
 }
 
 GLuint load_shader_program(const char* vertPath, const char* fragPath)
 {
 	std::string vertexCode = read_shader_file(vertPath);
-	std::string fragmentCode = read_shader_file(fragPath);
+	if (vertexCode.empty())
+	{
+		fprintf(stderr, "ERROR: Failed to read vertex shader file!\n");
+	}
+	printf("Loaded vertex shader (%zu bytes)\n", vertexCode.size());
 
+	std::string fragmentCode = read_shader_file(fragPath);
+	if (fragmentCode.empty())
+	{
+		fprintf(stderr, "ERROR: Failed to read fragment shader file!\n");
+	}
+	printf("Loaded fragment shader (%zu bytes)\n", fragmentCode.size());
+	
 	const char* vsrc = vertexCode.c_str();
 	const char* fsrc = fragmentCode.c_str();
 
@@ -290,9 +304,16 @@ int main() {
 	};
 
 	GLfloat colors[] = {
-	1.0f, 0.0f, 0.0f,
-	0.0f, 1.0f, 0.0f,
-	0.0f, 0.0f, 1.0f
+		1.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 1.0f
+	};
+
+	float matrix[] = {
+		1.0f, 0.0f, 0.0f, 0.0f,
+		0.0f, 1.0f, 0.0f, 0.0f,
+		0.0f, 0.0f, 1.0f, 0.0f,
+		0.5f, 0.0f, 0.0f, 1.0f
 	};
 
 	GLuint points_vbo = 0;
@@ -315,44 +336,16 @@ int main() {
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
 
-	std::string vertexCode = read_shader_file("shaders/test.vert");
-	std::string fragmentCode = read_shader_file("shaders/test.frag");
-
-	const char* vShaderSource = vertexCode.c_str();
-	const char* fShaderSource = fragmentCode.c_str();
-
-	GLuint vs = glCreateShader(GL_VERTEX_SHADER);
-	glShaderSource(vs, 1, &vShaderSource, NULL);
-	glCompileShader(vs);
-
-	// check for compilation errors
-	int params = -1;
-	glGetShaderiv(vs, GL_COMPILE_STATUS, &params);
-	if (GL_TRUE != params)
-	{
-		fprintf(stderr, "ERROR: GL shader index %i did not compile\n", vs);
-		_print_shader_info_log(vs);
-		return false;
-	}
-
-	GLuint fs = glCreateShader(GL_FRAGMENT_SHADER);
-	glShaderSource(fs, 1, &fShaderSource, NULL);
-	glCompileShader(fs);
-
-	glGetShaderiv(fs, GL_COMPILE_STATUS, &params);
-	if (GL_TRUE != params)
-	{
-		fprintf(stderr, "ERROR: GL shader index %i did not compile\n", fs);
-		_print_shader_info_log(fs);
-		return false;
-	}
-
 	GLuint shader_program = load_shader_program("shaders/test.vert", "shaders/test.frag");
 	if (!shader_program)
 	{
 		fprintf(stderr, "ERROR: could not load shaders\n");
 		return 1;
 	}
+
+	int matrix_location = glGetUniformLocation(shader_program, "matrix");
+	glUseProgram(shader_program);
+	glUniformMatrix4fv(matrix_location, 1, GL_FALSE, matrix);
 
 	glfwSetWindowSizeCallback(window, glfw_window_size_callback);
 	glfwSetFramebufferSizeCallback(window, glfw_framebuffer_resize_callback);
@@ -366,6 +359,7 @@ int main() {
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glViewport(0, 0, g_fb_width, g_fb_height);
 		glUseProgram(shader_program);
+		
 		glBindVertexArray(vao);
 
 		static bool reloadPressed = false;
@@ -381,6 +375,8 @@ int main() {
 					shader_program = new_program;
 					glUseProgram(shader_program);
 
+					matrix_location = glGetUniformLocation(shader_program, "matrix");
+					glUniformMatrix4fv(matrix_location, 1, GL_FALSE, matrix);
 					printf("Shaders successfully reloaded.\n");
 				}
 				else

@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 3.20)
+﻿cmake_minimum_required(VERSION 3.20)
 
 project(ComputerGraphics LANGUAGES CXX)
 
@@ -31,10 +31,8 @@ file(GLOB SHADERS
     "${CMAKE_SOURCE_DIR}/shaders/*.frag"
 )
 
-add_custom_target(copy_shaders ALL
+add_custom_command(TARGET ComputerGraphics POST_BUILD
     COMMAND ${CMAKE_COMMAND} -E copy_directory
-        ${CMAKE_SOURCE_DIR}/shaders
-        $<TARGET_FILE_DIR:ComputerGraphics>/shaders
+    ${CMAKE_SOURCE_DIR}/shaders
+    $<TARGET_FILE_DIR:ComputerGraphics>/shaders
 )
-
-add_dependencies(ComputerGraphics copy_shaders)
