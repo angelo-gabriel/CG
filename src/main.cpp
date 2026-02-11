@@ -352,14 +352,33 @@ int main() {
 
 	glClearColor(0.6f, 0.7f, 0.8f, 1.0f);
 	
+	float speed = 1.0f;
+	float last_position = 0.0f;
+
 	// rendering loop
 	while (!glfwWindowShouldClose(window))
 	{
+		static double previous_seconds = glfwGetTime();
+		double current_seconds = glfwGetTime();
+		double elapsed_seconds = current_seconds - previous_seconds;
+		previous_seconds = current_seconds;
+
+		if (fabs(last_position) > 1.0f)
+		{
+			speed = -speed;
+		}
+
 		_update_fps_counter(window);
+
+		// update the matrix
+		matrix[12] = elapsed_seconds * speed + last_position;
+		last_position = matrix[12];
+		glUseProgram(shader_program);
+		glUniformMatrix4fv(matrix_location, 1, GL_FALSE, matrix);
+		
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glViewport(0, 0, g_fb_width, g_fb_height);
 		glUseProgram(shader_program);
-		
 		glBindVertexArray(vao);
 
 		static bool reloadPressed = false;
