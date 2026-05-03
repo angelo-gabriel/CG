@@ -1,4 +1,6 @@
-﻿#include <GL/glew.h>
+﻿#include "maths_funcs.h"
+
+#include <GL/glew.h>
 #include <GLFW/glfw3.h>
 
 #include <assert.h>
@@ -7,6 +9,9 @@
 #include <fstream>
 #include <sstream>
 #include <string>
+#include <time.h>
+#define _USE_MATH_DEFINES
+#include <math.h>
 
 #include "logging.h"
 
@@ -313,7 +318,7 @@ int main() {
 		1.0f, 0.0f, 0.0f, 0.0f,
 		0.0f, 1.0f, 0.0f, 0.0f,
 		0.0f, 0.0f, 1.0f, 0.0f,
-		0.5f, 0.0f, 0.0f, 1.0f
+		0.0f, 0.0f, 0.0f, 1.0f
 	};
 
 	GLuint points_vbo = 0;
@@ -351,11 +356,50 @@ int main() {
 	glfwSetFramebufferSizeCallback(window, glfw_framebuffer_resize_callback);
 
 	glClearColor(0.6f, 0.7f, 0.8f, 1.0f);
-	
-	float speed = 1.0f;
-	float last_position = 0.0f;
 
-	// rendering loop
+	float cam_speed = 1.0f;
+	float cam_yaw_speed = 10.0f;
+
+	// camera variables
+	float cam_pos[] = { 0.0f, 0.0f, 2.0f };
+	float cam_yaw = 0.0f;
+
+	mat4 T = translate(identity_mat4(), vec3(-cam_pos[0], -cam_pos[1], -cam_pos[2]));
+	mat4 R = rotate_y_deg(identity_mat4(), -cam_yaw);
+	mat4 view_mat = R * T;
+
+	// input variables
+	float near = 0.1f;
+	float far = 100.0f;
+	float fov= 67.0f * ONE_DEG_IN_RAD;
+	float aspect = (float)g_win_width / (float)g_win_height;
+	// matrix components
+	float range = tan(fov * 0.5f) * near;
+	float Sx = (2.0f * near) / (range * aspect + range * aspect);
+	float Sy = near / range;
+	float Sz = -(far + near) / (far - near);
+	float Pz = -(2.0f * far * near) / (far - near);
+
+	GLfloat proj_mat[] = {
+		Sx, 0.0f, 0.0f, 0.0f,
+		0.0f, Sy, 0.0f, 0.0f,
+		0.0f, 0.0f, Sz, -1.0f,
+		0.0f, 0.0f, Pz, 0.0f
+	};
+
+	// get location numbers of matrices
+	GLint view_mat_location = glGetUniformLocation(shader_program, "view");
+	GLint proj_mat_location = glGetUniformLocation(shader_program, "proj");
+	glUseProgram(shader_program);
+	glUniformMatrix4fv(view_mat_location, 1, GL_FALSE, view_mat.m);
+	glUniformMatrix4fv(proj_mat_location, 1, GL_FALSE, proj_mat);
+
+	// winding and back-face culling
+	glEnable(GL_CULL_FACE);
+	glCullFace(GL_BACK);
+	glFrontFace(GL_CW);
+
+	// ---------- rendering loop ----------
 	while (!glfwWindowShouldClose(window))
 	{
 		static double previous_seconds = glfwGetTime();
@@ -363,19 +407,8 @@ int main() {
 		double elapsed_seconds = current_seconds - previous_seconds;
 		previous_seconds = current_seconds;
 
-		if (fabs(last_position) > 1.0f)
-		{
-			speed = -speed;
-		}
-
 		_update_fps_counter(window);
 
-		// update the matrix
-		matrix[12] = elapsed_seconds * speed + last_position;
-		last_position = matrix[12];
-		glUseProgram(shader_program);
-		glUniformMatrix4fv(matrix_location, 1, GL_FALSE, matrix);
-		
 		glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 		glViewport(0, 0, g_fb_width, g_fb_height);
 		glUseProgram(shader_program);
@@ -410,19 +443,66 @@ int main() {
 			reloadPressed = false;
 		}
 
-		// winding and back-face culling
-		glEnable(GL_CULL_FACE);
-		glCullFace(GL_BACK);
-		glFrontFace(GL_CW);
-
 		glDrawArrays(GL_TRIANGLES, 0, 3);
-
-		glfwSwapBuffers(window);
 		glfwPollEvents();
+
+		// ----- camera movement -----
+		bool cam_moved = false;
+		if (glfwGetKey(window, GLFW_KEY_A)) 
+		{
+			cam_pos[0] -= cam_speed * elapsed_seconds;
+			cam_moved = true;
+		}
+		if (glfwGetKey(window, GLFW_KEY_D)) 
+		{
+			cam_pos[0] += cam_speed * elapsed_seconds;
+			cam_moved = true;
+		}
+		if (glfwGetKey(window, GLFW_KEY_PAGE_UP))
+		{
+			cam_pos[1] += cam_speed * elapsed_seconds;
+			cam_moved = true;
+		}
+		if (glfwGetKey(window, GLFW_KEY_PAGE_DOWN))
+		{
+			cam_pos[1] -= cam_speed * elapsed_seconds;
+			cam_moved = true;
+		}
+		if (glfwGetKey(window, GLFW_KEY_W))
+		{
+			cam_pos[2] -= cam_speed * elapsed_seconds;
+			cam_moved = true;
+		}
+		if (glfwGetKey(window, GLFW_KEY_S))
+		{
+			cam_pos[2] += cam_speed * elapsed_seconds;
+			cam_moved = true;
+		}
+		if (glfwGetKey(window, GLFW_KEY_LEFT)) 
+		{
+			cam_yaw += cam_yaw_speed * elapsed_seconds;
+			cam_moved = true;
+		}
+		if (glfwGetKey(window, GLFW_KEY_RIGHT)) 
+		{
+			cam_yaw -= cam_yaw_speed * elapsed_seconds;
+			cam_moved = true;
+		}
+		// update view matrix
+		if (cam_moved)
+		{
+			mat4 T = translate(identity_mat4(), vec3(-cam_pos[0], -cam_pos[1], -cam_pos[2]));
+			mat4 R = rotate_y_deg(identity_mat4(), -cam_yaw);
+			mat4 view_mat = R * T;
+			glUniformMatrix4fv(view_mat_location, 1, GL_FALSE, view_mat.m);
+		}
+
 		if (GLFW_PRESS == glfwGetKey(window, GLFW_KEY_ESCAPE))
 		{
 			glfwSetWindowShouldClose(window, 1);
 		}
+
+		glfwSwapBuffers(window);
 	}
 
 	glfwTerminate();
