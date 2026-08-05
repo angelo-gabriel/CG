@@ -14,6 +14,7 @@
 #include <math.h>
 
 #include "logging.h"
+#include "stb_image.h"
 
 void glfw_error_callback(int error, const char* description)
 {
@@ -25,12 +26,6 @@ int g_win_height = 480;
 
 int g_fb_width = 640;
 int g_fb_height = 480;
-
-GLfloat points[] = {
-	0.0f, 0.5f, 0.0f,
-	0.5f, -0.5f, 0.0f,
-	-0.5f, -0.5f, 0.0f
-};
 
 const char* GL_type_to_string(GLenum type)
 {
@@ -262,6 +257,47 @@ GLuint load_shader_program(const char* vertPath, const char* fragPath)
 	return program;
 }
 
+GLuint loadTexture(const char* path)
+{
+	unsigned int texture;
+	glGenTextures(1, &texture);
+	glBindTexture(GL_TEXTURE_2D, texture);
+
+	int imgWidth, imgHeight, nrChannels;
+	stbi_set_flip_vertically_on_load(true);
+	unsigned char* data = stbi_load(path, &imgWidth, &imgHeight, &nrChannels, 0);
+
+	if (data)
+	{
+		GLenum format = GL_RGB;
+		if (nrChannels == 1)
+			format = GL_RED;
+		else if (nrChannels == 3)
+			format = GL_RGB;
+		else if (nrChannels == 4)
+			format = GL_RGBA;
+
+		glBindTexture(GL_TEXTURE_2D, texture);
+		glTexImage2D(GL_TEXTURE_2D, 0, format, imgWidth, imgHeight, 0, format, GL_UNSIGNED_BYTE, data);
+		glGenerateMipmap(GL_TEXTURE_2D);
+
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR_MIPMAP_LINEAR);
+		glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+
+		stbi_image_free(data);
+	}
+	else
+	{
+		std::cout << "Failed loading texture on path: " << path << std::endl;
+		stbi_image_free(data);
+		return 0;
+	}
+
+	return texture;
+}
+
 int main() {
 	glfwSetErrorCallback(glfw_error_callback);
 
@@ -303,7 +339,11 @@ int main() {
 	glDepthFunc(GL_LESS);
 
 	GLfloat points[] = {
-		0.0f, 0.5f, 0.0f,
+		-0.5f, 0.5f, 0.0f,
+		0.5f, 0.5f, 0.0f,
+		-0.5f, -0.5f, 0.0f,
+
+		0.5f, 0.5f, 0.0f,
 		0.5f, -0.5f, 0.0f,
 		-0.5f, -0.5f, 0.0f
 	};
@@ -311,7 +351,21 @@ int main() {
 	GLfloat colors[] = {
 		1.0f, 0.0f, 0.0f,
 		0.0f, 1.0f, 0.0f,
+		0.0f, 0.0f, 1.0f,
+
+		0.0f, 1.0f, 0.0f,
+		1.0f, 1.0f, 0.0f,
 		0.0f, 0.0f, 1.0f
+	};
+
+	GLfloat tex_coords[] = {
+		0.0f, 1.0f,
+		1.0f, 1.0f,
+		0.0f, 0.0f,
+
+		1.0f, 1.0f,
+		1.0f, 0.0f,
+		0.0f, 0.0f
 	};
 
 	float matrix[] = {
@@ -321,6 +375,7 @@ int main() {
 		0.0f, 0.0f, 0.0f, 1.0f
 	};
 
+	// Configuração do VBO
 	GLuint points_vbo = 0;
 	glGenBuffers(1, &points_vbo);
 	glBindBuffer(GL_ARRAY_BUFFER, points_vbo);
@@ -331,15 +386,28 @@ int main() {
 	glBindBuffer(GL_ARRAY_BUFFER, colors_vbo);
 	glBufferData(GL_ARRAY_BUFFER, sizeof(colors), colors, GL_STATIC_DRAW);
 
+	GLuint tex_vbo = 0;
+	glGenBuffers(1, &tex_vbo);
+	glBindBuffer(GL_ARRAY_BUFFER, tex_vbo);
+	glBufferData(GL_ARRAY_BUFFER, sizeof(tex_coords), tex_coords, GL_STATIC_DRAW);
+
+	// Configuração do VAO
 	GLuint vao = 0;
 	glGenVertexArrays(1, &vao);
 	glBindVertexArray(vao);
+
 	glBindBuffer(GL_ARRAY_BUFFER, points_vbo);
 	glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+
 	glBindBuffer(GL_ARRAY_BUFFER, colors_vbo);
 	glVertexAttribPointer(1, 3, GL_FLOAT, GL_FALSE, 0, NULL);
+
+	glBindBuffer(GL_ARRAY_BUFFER, tex_vbo);
+	glVertexAttribPointer(2, 2, GL_FLOAT, GL_FALSE, 0, NULL);
+
 	glEnableVertexAttribArray(0);
 	glEnableVertexAttribArray(1);
+	glEnableVertexAttribArray(2);
 
 	GLuint shader_program = load_shader_program("shaders/test.vert", "shaders/test.frag");
 	if (!shader_program)
@@ -399,6 +467,8 @@ int main() {
 	glCullFace(GL_BACK);
 	glFrontFace(GL_CW);
 
+	GLuint myTexture = loadTexture("../../../resources/container.jpg");
+
 	// ---------- rendering loop ----------
 	while (!glfwWindowShouldClose(window))
 	{
@@ -443,7 +513,9 @@ int main() {
 			reloadPressed = false;
 		}
 
-		glDrawArrays(GL_TRIANGLES, 0, 3);
+		glActiveTexture(GL_TEXTURE0);
+		glBindTexture(GL_TEXTURE_2D, myTexture);
+		glDrawArrays(GL_TRIANGLES, 0, 6);
 		glfwPollEvents();
 
 		// ----- camera movement -----

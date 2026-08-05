@@ -12,7 +12,7 @@ find_package(GLEW REQUIRED)
 add_executable(ComputerGraphics
     src/main.cpp
     src/logging.cpp
- "src/maths_funcs.h" "src/maths_funcs.cpp")
+ "src/maths_funcs.h" "src/maths_funcs.cpp" "src/stb_image.cpp" "src/stb_image.h")
 
 target_include_directories(ComputerGraphics
     PRIVATE
